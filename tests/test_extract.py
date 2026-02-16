@@ -1,7 +1,9 @@
 from pathlib import Path
 
-import pandas as pd
 import pytest
+
+pd = pytest.importorskip("pandas")
+pytest.importorskip("openpyxl")
 
 from src.extract import load_excel_dataset
 from src.utils import COUNTY_COLUMNS
@@ -30,23 +32,24 @@ def _make_excel(tmp_path: Path, years: list[int]) -> Path:
             }
         )
         rows.append(row)
+
     county = pd.DataFrame(rows)
-    p = tmp_path / "in.xlsx"
-    with pd.ExcelWriter(p) as writer:
+    path = tmp_path / "in.xlsx"
+    with pd.ExcelWriter(path) as writer:
         meta.to_excel(writer, sheet_name="Meta", index=False)
         county.to_excel(writer, sheet_name="County", index=False)
-    return p
+    return path
 
 
 def test_year_check_allows_extra_years(tmp_path: Path):
-    expected_plus_extra = [2010, 2012, 2014, 2016, 2018, 2019, 2021, 2022, 2023, 2024]
-    p = _make_excel(tmp_path, expected_plus_extra)
-    _, _, warnings = load_excel_dataset(p)
+    years = [2010, 2012, 2014, 2016, 2018, 2019, 2021, 2022, 2023, 2024]
+    path = _make_excel(tmp_path, years)
+    _, _, warnings = load_excel_dataset(path)
     assert any("Extra years detected" in w for w in warnings)
 
 
 def test_year_check_fails_when_required_missing(tmp_path: Path):
-    missing_2023 = [2010, 2012, 2014, 2016, 2018, 2019, 2021, 2022]
-    p = _make_excel(tmp_path, missing_2023)
+    years = [2010, 2012, 2014, 2016, 2018, 2019, 2021, 2022]
+    path = _make_excel(tmp_path, years)
     with pytest.raises(ValueError):
-        load_excel_dataset(p)
+        load_excel_dataset(path)

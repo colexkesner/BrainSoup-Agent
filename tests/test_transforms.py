@@ -1,4 +1,5 @@
-import pandas as pd
+import pytest
+pd = pytest.importorskip("pandas")
 
 from src.transforms import add_derived_metrics, filter_five_year_window, integrity_checks, normalize_county_keys
 from src.utils import pad_fips, safe_divide

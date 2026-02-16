@@ -1,10 +1,12 @@
 from pathlib import Path
 
-import pandas as pd
-import yaml
+import pytest
+pd = pytest.importorskip("pandas")
+pytest.importorskip("openpyxl")
 from pypdf import PdfWriter
 
 from src.run_pipeline import run_pipeline
+from src.utils import save_yaml
 
 
 def _make_input_files(tmp_path: Path) -> tuple[Path, Path]:
@@ -62,10 +64,11 @@ def test_smoke_pipeline(tmp_path: Path):
     (tmp_path / "neighbors.yaml").write_text("bulloch_neighbors: []\n", encoding="utf-8")
     (tmp_path / "approvals.yaml").write_text("approved_datasets: []\n", encoding="utf-8")
     config_path = tmp_path / "config.yaml"
-    config_path.write_text(yaml.safe_dump(cfg), encoding="utf-8")
+    save_yaml(config_path, cfg)
 
     run_pipeline(str(config_path))
 
     assert (tmp_path / "powerbi" / "fact_county_year.csv").exists()
     assert (tmp_path / "powerbi" / "snapshot_2023.csv").exists()
+    assert (tmp_path / "powerbi" / "fact_enriched.csv").exists()
     assert (tmp_path / "reports" / "report.md").exists()

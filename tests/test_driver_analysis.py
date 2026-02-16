@@ -1,4 +1,5 @@
-import pandas as pd
+import pytest
+pd = pytest.importorskip("pandas")
 
 from src.driver_analysis import run_driver_analysis
 
