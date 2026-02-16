@@ -11,6 +11,10 @@ top_n: 10
 pca_components: 3
 enable_gmm: false
 allow_auto_download: false
+hitl_mode: auto_reject
+approved_data_dir: data/raw/approved
+external_join_min_match_rate: 0.5
+approvals_path: config/approvals.yaml
 input_paths:
   excel: /mnt/data/INFORMS Case Competition Data 2025-26.xlsx
   pdf: /mnt/data/INFORMS Case Competition Questions Rules Checkpoints 2025-26 (1).pdf

@@ -10,3 +10,4 @@ pytest==8.3.5
 rich==13.9.4
 tqdm==4.67.1
 scipy==1.15.2
+streamlit==1.42.2

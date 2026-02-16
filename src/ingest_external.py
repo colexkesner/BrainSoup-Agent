@@ -1,0 +1,193 @@
+from __future__ import annotations
+
+import io
+import zipfile
+from pathlib import Path
+from typing import Any
+
+import pandas as pd
+
+from src.utils import append_jsonl, now_iso
+
+ALLOWED_EXTENSIONS = {".csv", ".xlsx", ".zip"}
+
+
+def _normalize_county(value: Any) -> str:
+    return str(value).lower().replace(" county", "").strip()
+
+
+def _slug(name: str) -> str:
+    return "".join(ch.lower() if ch.isalnum() else "_" for ch in name).strip("_")
+
+
+def _find_local_file(dataset_name: str, approved_dir: Path, dataset_meta: dict[str, Any]) -> Path | None:
+    explicit = dataset_meta.get("local_file")
+    if explicit:
+        p = Path(explicit)
+        if p.exists():
+            return p
+        p2 = approved_dir / explicit
+        if p2.exists():
+            return p2
+    slug = _slug(dataset_name)
+    for f in sorted(approved_dir.glob("*")):
+        if slug in _slug(f.stem):
+            return f
+    files = sorted(approved_dir.glob("*"))
+    return files[0] if len(files) == 1 else None
+
+
+def _load_external_frame(path: Path) -> pd.DataFrame:
+    ext = path.suffix.lower()
+    if ext == ".csv":
+        return pd.read_csv(path)
+    if ext == ".xlsx":
+        return pd.read_excel(path)
+    if ext == ".zip":
+        with zipfile.ZipFile(path, "r") as zf:
+            candidates = [n for n in zf.namelist() if n.lower().endswith(".csv") or n.lower().endswith(".xlsx")]
+            if not candidates:
+                raise ValueError(f"Zip file {path} contains no csv/xlsx files")
+            name = candidates[0]
+            with zf.open(name) as f:
+                payload = f.read()
+            if name.lower().endswith(".csv"):
+                return pd.read_csv(io.BytesIO(payload))
+            return pd.read_excel(io.BytesIO(payload))
+    raise ValueError(f"Unsupported file type: {ext}")
+
+
+def _prepare_joinable_frame(df: pd.DataFrame) -> pd.DataFrame:
+    out = df.copy()
+    cols = {c.lower(): c for c in out.columns}
+    if "fips" not in out.columns:
+        if "geo id2" in cols:
+            out["fips"] = out[cols["geo id2"]].apply(lambda x: f"{int(x):05d}")
+        elif "fips_code" in cols:
+            out["fips"] = out[cols["fips_code"]].apply(lambda x: f"{int(x):05d}")
+    if "year" not in out.columns and "year" in cols:
+        out["year"] = out[cols["year"]].astype(int)
+    if "county_name_norm" not in out.columns:
+        county_col = cols.get("county") or cols.get("county_name")
+        if county_col:
+            out["county_name_norm"] = out[county_col].map(_normalize_county)
+    if "state" not in out.columns:
+        state_col = cols.get("state") or cols.get("state abbr")
+        if state_col:
+            out["state"] = out[state_col].astype(str)
+    return out
+
+
+def _validate_join_keys(join_keys: list[str]) -> tuple[bool, str]:
+    jk = {k.strip().lower() for k in join_keys}
+    if {"fips", "year"}.issubset(jk) or {"county_name_norm", "state", "year"}.issubset(jk):
+        return True, "ok"
+    return False, "join keys must include either [fips, year] or [county_name_norm, state, year]"
+
+
+def ingest_approved_datasets(
+    base_df: pd.DataFrame,
+    approvals: dict[str, Any],
+    cfg: dict[str, Any],
+    run_log_path: str,
+) -> tuple[pd.DataFrame, list[dict[str, Any]], pd.DataFrame]:
+    approved_dir = Path(cfg.get("approved_data_dir", "data/raw/approved"))
+    approved_dir.mkdir(parents=True, exist_ok=True)
+    min_match_rate = float(cfg.get("external_join_min_match_rate", 0.5))
+
+    enriched = base_df.copy()
+    ingest_records: list[dict[str, Any]] = []
+
+    for ds in approvals.get("approved_datasets", []):
+        if ds.get("status") != "approved":
+            continue
+        name = ds.get("name", "unnamed_dataset")
+        join_keys = ds.get("join_keys", [])
+        allow_low_match = bool(ds.get("allow_low_match_override", False))
+
+        valid_keys, msg = _validate_join_keys(join_keys)
+        if not valid_keys:
+            ingest_records.append({"name": name, "status": "blocked_invalid_join_keys", "detail": msg})
+            append_jsonl(run_log_path, {"ts": now_iso(), "event": "external_ingest_blocked", "dataset": name, "reason": msg})
+            continue
+
+        local_file = _find_local_file(name, approved_dir, ds)
+        if local_file is None:
+            ingest_records.append({"name": name, "status": "blocked_missing_file", "detail": "No mapped local file in data/raw/approved"})
+            append_jsonl(run_log_path, {"ts": now_iso(), "event": "external_ingest_blocked", "dataset": name, "reason": "missing local file"})
+            continue
+
+        if local_file.suffix.lower() not in ALLOWED_EXTENSIONS:
+            ingest_records.append({"name": name, "status": "blocked_filetype", "detail": str(local_file)})
+            continue
+
+        external = _prepare_joinable_frame(_load_external_frame(local_file))
+
+        keys = ["fips", "year"] if {"fips", "year"}.issubset({k.lower() for k in join_keys}) else ["county_name_norm", "state", "year"]
+        missing_required = [k for k in keys if k not in external.columns]
+        if missing_required:
+            ingest_records.append({"name": name, "status": "blocked_missing_columns", "detail": ",".join(missing_required)})
+            append_jsonl(run_log_path, {"ts": now_iso(), "event": "external_ingest_blocked", "dataset": name, "reason": f"missing columns {missing_required}"})
+            continue
+
+        dedup = external.drop_duplicates(subset=keys).copy()
+        base_keys = enriched[keys].drop_duplicates()
+        joined_keys = base_keys.merge(dedup[keys], on=keys, how="left", indicator=True)
+        match_rate = float((joined_keys["_merge"] == "both").mean()) if len(joined_keys) else 0.0
+        mismatch_rate = 1.0 - match_rate
+
+        if match_rate < min_match_rate and not allow_low_match:
+            ingest_records.append(
+                {
+                    "name": name,
+                    "status": "blocked_low_match",
+                    "detail": f"match_rate={match_rate:.3f} below threshold={min_match_rate:.3f}",
+                    "local_file": str(local_file),
+                    "join_keys": ",".join(keys),
+                    "match_rate": match_rate,
+                    "mismatch_rate": mismatch_rate,
+                }
+            )
+            append_jsonl(
+                run_log_path,
+                {
+                    "ts": now_iso(),
+                    "event": "external_ingest_blocked",
+                    "dataset": name,
+                    "reason": "low_match",
+                    "match_rate": match_rate,
+                    "threshold": min_match_rate,
+                },
+            )
+            continue
+
+        cols_to_add = [c for c in dedup.columns if c not in keys]
+        renamed = dedup[keys + cols_to_add].rename(columns={c: f"ext_{_slug(name)}__{c}" for c in cols_to_add})
+        enriched = enriched.merge(renamed, on=keys, how="left")
+
+        ingest_records.append(
+            {
+                "name": name,
+                "status": "used",
+                "detail": "joined",
+                "local_file": str(local_file),
+                "join_keys": ",".join(keys),
+                "match_rate": match_rate,
+                "mismatch_rate": mismatch_rate,
+            }
+        )
+        append_jsonl(
+            run_log_path,
+            {
+                "ts": now_iso(),
+                "event": "external_ingest_used",
+                "dataset": name,
+                "local_file": str(local_file),
+                "join_keys": keys,
+                "match_rate": match_rate,
+                "mismatch_rate": mismatch_rate,
+            },
+        )
+
+    provenance = pd.DataFrame(ingest_records)
+    return enriched, ingest_records, provenance

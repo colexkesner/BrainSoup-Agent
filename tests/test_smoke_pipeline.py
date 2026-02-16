@@ -56,8 +56,11 @@ def test_smoke_pipeline(tmp_path: Path):
         "weights": {"alice_pct": 0.35, "poverty_pct": 0.35, "log_alice_households": 0.15, "log_poverty_households": 0.15},
         "output_dirs": {"powerbi": str(tmp_path / "powerbi"), "reports": str(tmp_path / "reports"), "logs": str(tmp_path / "logs")},
         "input_paths": {"excel": str(excel), "pdf": str(pdf), "neighbors_yaml": str(tmp_path / "neighbors.yaml")},
+        "hitl_mode": "auto_reject",
+        "approvals_path": str(tmp_path / "approvals.yaml"),
     }
     (tmp_path / "neighbors.yaml").write_text("bulloch_neighbors: []\n", encoding="utf-8")
+    (tmp_path / "approvals.yaml").write_text("approved_datasets: []\n", encoding="utf-8")
     config_path = tmp_path / "config.yaml"
     config_path.write_text(yaml.safe_dump(cfg), encoding="utf-8")
 
