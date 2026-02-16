@@ -1,0 +1,35 @@
+seed: 42
+provider: openai
+web_search_tool_type: web_search
+enable_hosted_container_tools: false
+model: gpt-4.1-mini
+max_retries: 2
+sample_row_cap: 200
+percent_round_decimals: 4
+relative_error_tolerance: 0.01
+top_n: 10
+pca_components: 3
+enable_gmm: false
+allow_auto_download: false
+hitl_mode: auto_reject
+approved_data_dir: data/raw/approved
+external_join_min_match_rate: 0.5
+allow_county_state_year_join: true
+use_external_features_in_driver_analysis: false
+external_feature_allowlist: []
+approvals_path: config/approvals.yaml
+input_paths:
+  excel: data/raw/informs.xlsx
+  pdf: data/raw/informs_rules.pdf
+  neighbors_yaml: config/neighbors.yaml
+output_dirs:
+  powerbi: outputs/powerbi
+  reports: outputs/reports
+  logs: outputs/logs
+cache_dir: outputs/logs/llm_calls_cache
+weights:
+  alice_pct: 0.35
+  poverty_pct: 0.35
+  log_alice_households: 0.15
+  log_poverty_households: 0.15
+pdf_text_min_chars: 800
