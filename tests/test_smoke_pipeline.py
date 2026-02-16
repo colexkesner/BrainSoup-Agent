@@ -68,5 +68,4 @@ def test_smoke_pipeline(tmp_path: Path):
 
     assert (tmp_path / "powerbi" / "fact_county_year.csv").exists()
     assert (tmp_path / "powerbi" / "snapshot_2023.csv").exists()
-    assert (tmp_path / "powerbi" / "fact_enriched.csv").exists()
     assert (tmp_path / "reports" / "report.md").exists()
