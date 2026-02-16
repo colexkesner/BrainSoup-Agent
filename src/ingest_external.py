@@ -78,15 +78,11 @@ def _prepare_joinable_frame(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-def _validate_join_keys(join_keys: list[str], allow_county_state_year: bool) -> tuple[bool, str]:
+def _validate_join_keys(join_keys: list[str]) -> tuple[bool, str]:
     jk = {k.strip().lower() for k in join_keys}
-    if {"fips", "year"}.issubset(jk):
+    if {"fips", "year"}.issubset(jk) or {"county_name_norm", "state", "year"}.issubset(jk):
         return True, "ok"
-    if allow_county_state_year and {"county_name_norm", "state", "year"}.issubset(jk):
-        return True, "ok"
-    if allow_county_state_year:
-        return False, "join keys must include either [fips, year] or [county_name_norm, state, year]"
-    return False, "join keys must include [fips, year] (county/state/year disabled by config)"
+    return False, "join keys must include either [fips, year] or [county_name_norm, state, year]"
 
 
 def ingest_approved_datasets(
@@ -98,7 +94,6 @@ def ingest_approved_datasets(
     approved_dir = Path(cfg.get("approved_data_dir", "data/raw/approved"))
     approved_dir.mkdir(parents=True, exist_ok=True)
     min_match_rate = float(cfg.get("external_join_min_match_rate", 0.5))
-    allow_county_state_year = bool(cfg.get("allow_county_state_year_join", True))
 
     enriched = base_df.copy()
     ingest_records: list[dict[str, Any]] = []
@@ -110,7 +105,7 @@ def ingest_approved_datasets(
         join_keys = ds.get("join_keys", [])
         allow_low_match = bool(ds.get("allow_low_match_override", False))
 
-        valid_keys, msg = _validate_join_keys(join_keys, allow_county_state_year=allow_county_state_year)
+        valid_keys, msg = _validate_join_keys(join_keys)
         if not valid_keys:
             ingest_records.append({"name": name, "status": "blocked_invalid_join_keys", "detail": msg})
             append_jsonl(run_log_path, {"ts": now_iso(), "event": "external_ingest_blocked", "dataset": name, "reason": msg})

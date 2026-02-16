@@ -15,24 +15,17 @@ DATE_PATTERN = re.compile(
 )
 
 
-def load_excel_dataset(path: str | Path) -> tuple[pd.DataFrame, pd.DataFrame, list[str]]:
+def load_excel_dataset(path: str | Path) -> tuple[pd.DataFrame, pd.DataFrame]:
     xls = pd.ExcelFile(path)
     meta = pd.read_excel(xls, sheet_name="Meta")
     county = pd.read_excel(xls, sheet_name="County")
     missing = [c for c in COUNTY_COLUMNS if c not in county.columns]
     if missing:
         raise ValueError(f"County sheet missing expected columns: {missing}")
-
     years = set(pd.Series(county["Year"]).dropna().astype(int).unique().tolist())
-    if not EXPECTED_YEARS.issubset(years):
-        raise ValueError(f"Missing required years. got={sorted(years)} required_subset={sorted(EXPECTED_YEARS)}")
-
-    warnings: list[str] = []
-    extra_years = sorted(years - EXPECTED_YEARS)
-    if extra_years:
-        warnings.append(f"Extra years detected beyond expected set: {extra_years}")
-
-    return meta, county, warnings
+    if years != EXPECTED_YEARS:
+        raise ValueError(f"Unexpected year set. got={sorted(years)} expected={sorted(EXPECTED_YEARS)}")
+    return meta, county
 
 
 def extract_pdf_text(path: str | Path) -> str:

@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 
 from src.analysis import build_peers, build_rank_changes, compute_trends, find_anomalies, pca_and_cluster, snapshot_2023_rankings
-from src.approval import VALID_HITL_MODES, approval_gate, load_neighbors
+from src.approval import approval_gate, load_neighbors
 from src.extract import extract_checkpoints, extract_pdf_text, load_excel_dataset
 from src.ingest_external import ingest_approved_datasets
 from src.reporting import write_reports
@@ -36,16 +36,6 @@ def _neighbors_comparison(df_5yr: pd.DataFrame, neighbors: list[str]) -> pd.Data
     return df_5yr[df_5yr["County"].isin(counties)].copy()
 
 
-def _hitl_behavior(hitl_mode: str) -> tuple[bool, bool]:
-    if hitl_mode == "interactive":
-        return False, True
-    if hitl_mode == "auto_reject":
-        return True, False
-    if hitl_mode == "noninteractive_ui":
-        return False, False
-    raise ValueError(f"Unsupported hitl_mode={hitl_mode}")
-
-
 def run_pipeline(config_path: str, hitl_mode_override: str | None = None) -> None:
     cfg_raw = load_yaml(config_path)
     cfg = PipelineConfig(cfg_raw).raw
@@ -57,10 +47,7 @@ def run_pipeline(config_path: str, hitl_mode_override: str | None = None) -> Non
     excel_path = cfg["input_paths"]["excel"]
     pdf_path = cfg["input_paths"]["pdf"]
 
-    _, county_df, excel_warnings = load_excel_dataset(excel_path)
-    for w in excel_warnings:
-        append_jsonl(run_log, {"ts": now_iso(), "event": "excel_warning", "message": w})
-
+    _, county_df = load_excel_dataset(excel_path)
     pdf_text = extract_pdf_text(pdf_path)
     if len(pdf_text) < int(cfg.get("pdf_text_min_chars", 800)):
         append_jsonl(
@@ -76,7 +63,7 @@ def run_pipeline(config_path: str, hitl_mode_override: str | None = None) -> Non
 
     df = normalize_county_keys(county_df)
     df = add_derived_metrics(df, rounded_decimals=int(cfg.get("percent_round_decimals", 4)))
-    quality_warnings = integrity_checks(df, tolerance=float(cfg.get("relative_error_tolerance", 0.01))) + excel_warnings
+    quality_warnings = integrity_checks(df, tolerance=float(cfg.get("relative_error_tolerance", 0.01)))
     for w in quality_warnings:
         append_jsonl(run_log, {"ts": now_iso(), "event": "integrity_warning", "message": w})
 
@@ -88,34 +75,10 @@ def run_pipeline(config_path: str, hitl_mode_override: str | None = None) -> Non
     (Path(cfg["output_dirs"]["logs"]) / "research_recommendations.json").write_text(json.dumps(research, indent=2), encoding="utf-8")
 
     hitl_mode = hitl_mode_override or cfg.get("hitl_mode", "auto_reject")
-    if hitl_mode not in VALID_HITL_MODES:
-        raise ValueError(f"Unsupported hitl_mode={hitl_mode}; expected one of {sorted(VALID_HITL_MODES)}")
-
-    non_interactive_default_reject, terminal_prompt_enabled = _hitl_behavior(hitl_mode)
-    append_jsonl(
-        run_log,
-        {
-            "ts": now_iso(),
-            "event": "hitl_mode_selected",
-            "hitl_mode": hitl_mode,
-            "non_interactive_default_reject": non_interactive_default_reject,
-            "terminal_prompt_enabled": terminal_prompt_enabled,
-        },
-    )
-
     approvals_path = cfg.get("approvals_path", "config/approvals.yaml")
     approvals = approval_gate(research, approvals_path, hitl_mode=hitl_mode)
 
-    enriched_df, ingest_records, ingest_provenance = ingest_approved_datasets(df, approvals, cfg, str(run_log))
-    ingestion_warnings = [
-        f"External dataset '{r.get('name')}' excluded: {r.get('detail')}"
-        for r in ingest_records
-        if str(r.get("status", "")).startswith("blocked")
-    ]
-    quality_warnings.extend(ingestion_warnings)
-
-    ext_cols = [c for c in enriched_df.columns if c.startswith("ext_")]
-    append_jsonl(run_log, {"ts": now_iso(), "event": "enriched_features_detected", "count": len(ext_cols), "columns": ext_cols[:20]})
+    enriched_df, _, ingest_provenance = ingest_approved_datasets(df, approvals, cfg, str(run_log))
 
     snapshot_2023 = snapshot_2023_rankings(enriched_df, cfg.get("weights", {}), top_n=int(cfg.get("top_n", 10)))
     trends_window = filter_five_year_window(enriched_df)
@@ -137,7 +100,6 @@ def run_pipeline(config_path: str, hitl_mode_override: str | None = None) -> Non
 
     out_powerbi = Path(cfg["output_dirs"]["powerbi"])
     enriched_df.to_csv(out_powerbi / "fact_county_year.csv", index=False)
-    enriched_df.to_csv(out_powerbi / "fact_enriched.csv", index=False)
     snapshot_2023.to_csv(out_powerbi / "snapshot_2023.csv", index=False)
     trends_window.to_csv(out_powerbi / "trends_5yr.csv", index=False)
     if not bulloch_vs_neighbors.empty:
@@ -173,6 +135,6 @@ def run_pipeline(config_path: str, hitl_mode_override: str | None = None) -> Non
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", required=True)
-    parser.add_argument("--hitl-mode", choices=["interactive", "auto_reject", "noninteractive_ui"], default=None)
+    parser.add_argument("--hitl-mode", choices=["interactive", "auto_reject", "noninteractive_prompt"], default=None)
     args = parser.parse_args()
     run_pipeline(args.config, hitl_mode_override=args.hitl_mode)

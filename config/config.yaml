@@ -14,7 +14,6 @@ allow_auto_download: false
 hitl_mode: auto_reject
 approved_data_dir: data/raw/approved
 external_join_min_match_rate: 0.5
-allow_county_state_year_join: true
 approvals_path: config/approvals.yaml
 input_paths:
   excel: /mnt/data/INFORMS Case Competition Data 2025-26.xlsx
