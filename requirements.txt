@@ -1,0 +1,12 @@
+openai==1.68.2
+pandas==2.2.3
+numpy==2.2.3
+scikit-learn==1.6.1
+statsmodels==0.14.4
+pypdf==5.3.1
+pyyaml==6.0.2
+jsonschema==4.23.0
+pytest==8.3.5
+rich==13.9.4
+tqdm==4.67.1
+scipy==1.15.2

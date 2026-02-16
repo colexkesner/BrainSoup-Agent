@@ -1,0 +1,28 @@
+seed: 42
+provider: openai
+web_search_tool_type: web_search
+enable_hosted_container_tools: false
+model: gpt-4.1-mini
+max_retries: 2
+sample_row_cap: 200
+percent_round_decimals: 4
+relative_error_tolerance: 0.01
+top_n: 10
+pca_components: 3
+enable_gmm: false
+allow_auto_download: false
+input_paths:
+  excel: /mnt/data/INFORMS Case Competition Data 2025-26.xlsx
+  pdf: /mnt/data/INFORMS Case Competition Questions Rules Checkpoints 2025-26 (1).pdf
+  neighbors_yaml: config/neighbors.yaml
+output_dirs:
+  powerbi: outputs/powerbi
+  reports: outputs/reports
+  logs: outputs/logs
+cache_dir: outputs/logs/llm_calls_cache
+weights:
+  alice_pct: 0.35
+  poverty_pct: 0.35
+  log_alice_households: 0.15
+  log_poverty_households: 0.15
+pdf_text_min_chars: 800
