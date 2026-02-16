@@ -62,11 +62,7 @@ def write_reports(
         "## 4) Anomalies",
         f"Flagged anomaly count: {len(anomalies)} (see `anomalies.csv`).",
         "",
-        "## 5) Data Lineage & Join Quality",
-        "See `join_audit.csv` for dataset-by-dataset join coverage, match rates, and blocked reasons.",
-        "See `provenance.csv` for approval status and join outcomes used in this run.",
-        "",
-        "## 6) Recommended Additional Datasets (HITL Approval Required)",
+        "## 5) Recommended Additional Datasets (HITL Approval Required)",
     ])
     if research.get("recommended_datasets"):
         for ds in research["recommended_datasets"]:
@@ -77,11 +73,11 @@ def write_reports(
 
     lines.extend([
         "",
-        "## 7) Rules / Checkpoints Extracted from PDF",
+        "## 6) Rules / Checkpoints Extracted from PDF",
         "Parsed checkpoint rows are in `checkpoints_from_pdf.csv`.",
     ])
     for _, row in checkpoints_df.head(12).iterrows():
-        lines.append(f"- {row.get('date')}: {row.get('checkpoint_name')} (p.{row.get('page_number')}) — {row.get('description')}")
+        lines.append(f"- {row['dates_found']}: {row['raw_line']}")
 
     lines.extend([
         "",
@@ -92,7 +88,6 @@ def write_reports(
         "## Limitations",
         "- External drivers are not merged unless explicitly approved and ingested.",
         "- Geographic neighbors require user-provided neighbor file or approved adjacency dataset.",
-        "- Driver analysis outputs (if present) are associative/predictive only and not causal evidence.",
     ])
 
     (Path(report_dir) / "report.md").write_text("\n".join(lines), encoding="utf-8")

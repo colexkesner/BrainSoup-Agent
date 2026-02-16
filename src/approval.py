@@ -11,7 +11,7 @@ from src.utils import load_yaml, save_yaml
 
 console = Console()
 
-VALID_HITL_MODES = {"interactive", "auto_reject", "noninteractive_ui", "noninteractive_prompt"}
+VALID_HITL_MODES = {"interactive", "auto_reject", "noninteractive_prompt"}
 
 
 def _normalize_approval_item(item: dict[str, Any], status: str) -> dict[str, Any]:
@@ -43,9 +43,9 @@ def approval_gate(research: dict[str, Any], approvals_path: str, hitl_mode: str 
 
         if hitl_mode == "auto_reject":
             status = "rejected_or_pending"
-        elif hitl_mode in {"noninteractive_ui", "noninteractive_prompt"}:
+        elif hitl_mode == "noninteractive_prompt":
             status = "pending_user_input"
-            console.print(f"[yellow]Pending UI approval:[/yellow] {item.get('name')} ({item.get('purpose')})")
+            console.print(f"[yellow]Pending approval:[/yellow] {item.get('name')} ({item.get('purpose')})")
         else:
             if not is_tty:
                 status = "pending_user_input"

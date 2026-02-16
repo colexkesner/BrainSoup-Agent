@@ -14,13 +14,10 @@ allow_auto_download: false
 hitl_mode: auto_reject
 approved_data_dir: data/raw/approved
 external_join_min_match_rate: 0.5
-allow_county_state_year_join: true
-use_external_features_in_driver_analysis: false
-external_feature_allowlist: []
 approvals_path: config/approvals.yaml
 input_paths:
-  excel: data/raw/informs.xlsx
-  pdf: data/raw/informs_rules.pdf
+  excel: /mnt/data/INFORMS Case Competition Data 2025-26.xlsx
+  pdf: /mnt/data/INFORMS Case Competition Questions Rules Checkpoints 2025-26 (1).pdf
   neighbors_yaml: config/neighbors.yaml
 output_dirs:
   powerbi: outputs/powerbi
