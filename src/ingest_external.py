@@ -29,10 +29,12 @@ def _find_local_file(dataset_name: str, approved_dir: Path, dataset_meta: dict[s
         p2 = approved_dir / explicit
         if p2.exists():
             return p2
+
     slug = _slug(dataset_name)
     for f in sorted(approved_dir.glob("*")):
         if slug in _slug(f.stem):
             return f
+
     files = sorted(approved_dir.glob("*"))
     return files[0] if len(files) == 1 else None
 
@@ -60,21 +62,26 @@ def _load_external_frame(path: Path) -> pd.DataFrame:
 def _prepare_joinable_frame(df: pd.DataFrame) -> pd.DataFrame:
     out = df.copy()
     cols = {c.lower(): c for c in out.columns}
+
     if "fips" not in out.columns:
         if "geo id2" in cols:
             out["fips"] = out[cols["geo id2"]].apply(lambda x: f"{int(x):05d}")
         elif "fips_code" in cols:
             out["fips"] = out[cols["fips_code"]].apply(lambda x: f"{int(x):05d}")
+
     if "year" not in out.columns and "year" in cols:
         out["year"] = out[cols["year"]].astype(int)
+
     if "county_name_norm" not in out.columns:
         county_col = cols.get("county") or cols.get("county_name")
         if county_col:
             out["county_name_norm"] = out[county_col].map(_normalize_county)
+
     if "state" not in out.columns:
         state_col = cols.get("state") or cols.get("state abbr")
         if state_col:
             out["state"] = out[state_col].astype(str)
+
     return out
 
 
@@ -106,9 +113,11 @@ def ingest_approved_datasets(
     for ds in approvals.get("approved_datasets", []):
         if ds.get("status") != "approved":
             continue
+
         name = ds.get("name", "unnamed_dataset")
         join_keys = ds.get("join_keys", [])
         allow_low_match = bool(ds.get("allow_low_match_override", False))
+
         audit = {
             "dataset_name": name,
             "local_file": None,

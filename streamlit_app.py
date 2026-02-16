@@ -37,7 +37,10 @@ def _save_approvals(data: dict) -> None:
 
 
 if st.button("Run Pipeline"):
-    subprocess.run(["python", "-m", "src.run_pipeline", "--config", str(config_path), "--hitl-mode", "noninteractive_ui"], check=False)
+    subprocess.run(
+        ["python", "-m", "src.run_pipeline", "--config", str(config_path), "--hitl-mode", "noninteractive_ui"],
+        check=False,
+    )
     st.success("Pipeline command executed.")
 
 report_path = Path("outputs/reports/report.md")
@@ -109,8 +112,7 @@ if approved_names:
     target = st.selectbox("Map uploaded filename to approved dataset", approved_names)
     mapped_file = st.text_input("Filename in data/raw/approved", value="")
     if st.button("Save dataset file mapping") and mapped_file:
-        entry = existing[target]
-        entry["local_file"] = mapped_file
+        existing[target]["local_file"] = mapped_file
         approvals["approved_datasets"] = list(existing.values())
         _save_approvals(approvals)
         st.success(f"Mapped {target} -> {mapped_file}")

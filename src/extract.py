@@ -43,6 +43,7 @@ def load_excel_dataset(path: str | Path) -> tuple[pd.DataFrame, pd.DataFrame, li
 def extract_pdf_text_with_pages(path: str | Path) -> tuple[str, list[dict[str, str | int]]]:
     reader = PdfReader(str(path))
     page_chunks: list[dict[str, str | int]] = []
+
     for idx, page in enumerate(reader.pages, start=1):
         page_text = (page.extract_text() or "").strip()
         page_chunks.append({"page_number": idx, "text": page_text})
@@ -58,13 +59,16 @@ def extract_pdf_text(path: str | Path) -> str:
 
 def extract_checkpoints(page_chunks: list[dict[str, str | int]], context_window: int = 1) -> pd.DataFrame:
     rows: list[dict[str, str | int | None]] = []
+
     for chunk in page_chunks:
         page_number = int(chunk["page_number"])
         lines = [ln.strip() for ln in str(chunk["text"]).splitlines() if ln.strip()]
+
         for i, line in enumerate(lines):
             dates = DATE_PATTERN.findall(line)
             if not dates:
                 continue
+
             start = max(0, i - context_window)
             end = min(len(lines), i + context_window + 1)
             excerpt = " ".join(lines[start:end])

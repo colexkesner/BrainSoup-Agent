@@ -71,7 +71,6 @@ def run_pipeline(config_path: str, hitl_mode_override: str | None = None) -> Non
     excel_path = cfg["input_paths"]["excel"]
     pdf_path = cfg["input_paths"]["pdf"]
 
-    # Validate config/file presence before importing heavy dependencies.
     if not Path(excel_path).exists():
         raise FileNotFoundError(f"Excel input not found: {excel_path}")
     if not Path(pdf_path).exists():

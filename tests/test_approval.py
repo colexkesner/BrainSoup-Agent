@@ -28,5 +28,7 @@ def test_approval_gate_noninteractive_ui_writes_pending(tmp_path: Path):
 def test_approval_gate_noninteractive_prompt_alias(tmp_path: Path):
     approvals_path = tmp_path / "approvals.yaml"
     approvals_path.write_text("approved_datasets: []\n", encoding="utf-8")
-    out = approval_gate({"recommended_datasets": [{"name": "X", "join_keys": []}]}, str(approvals_path), hitl_mode="noninteractive_prompt")
+    research = {"recommended_datasets": [{"name": "X", "join_keys": []}]}
+
+    out = approval_gate(research, str(approvals_path), hitl_mode="noninteractive_prompt")
     assert out["approved_datasets"][0]["status"] == "pending_user_input"
